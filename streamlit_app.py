@@ -57,22 +57,30 @@ if prompt := st.chat_input("What lingo do you want to understand?"):
             ]
 
             # Call OpenAI API (using the chat completions endpoint)
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo", # You can try other models like gpt-4 if you have access
+            # Note: For openai >= 1.0.0, the client initialization is preferred
+            client = openai.OpenAI(api_key=openai.api_key) # You already set openai.api_key above
+            
+            response_stream = client.chat.completions.create( # Updated API call
+                model="gpt-3.5-turbo",
                 messages=api_messages,
-                stream=True, # For a streaming effect
+                stream=True,
             )
-            for chunk in response:
-                if chunk.choices[0].delta.get("content"):
+            for chunk in response_stream:
+                if chunk.choices[0].delta.content is not None: # Check if content is not None
                     full_response += chunk.choices[0].delta.content
-                    message_placeholder.markdown(full_response + "▌") # Blinking cursor effect
+                    message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
-        except openai.error.AuthenticationError:
+
+        except openai.AuthenticationError: # MODIFIED LINE
             full_response = "Error: Authentication failed. Please check your OpenAI API key and ensure it's configured correctly."
             message_placeholder.error(full_response)
-        except Exception as e:
-            full_response = f"Oops! Something went wrong: {e}"
+        except openai.APIError as e: # ADDED for more specific OpenAI errors
+            full_response = f"OpenAI API Error: {e}"
             message_placeholder.error(full_response)
+        except Exception as e: # General catch-all
+            full_response = f"Oops! An unexpected error occurred: {e}"
+            st.error(full_response) # Use st.error for better visibility
 
     # Add AI response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    if full_response: # Only add if there's a response (or error message)
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
