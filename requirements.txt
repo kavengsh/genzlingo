@@ -1,1 +1,2 @@
-streamlit
+streamlit>=1.45
+openai>=1.14
